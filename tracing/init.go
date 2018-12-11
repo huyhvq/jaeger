@@ -7,12 +7,13 @@ import (
 	"github.com/uber/jaeger-client-go/rpcmetrics"
 	"github.com/uber/jaeger-lib/metrics"
 	"go.uber.org/zap"
+	"io"
 
 	"github.com/huyhvq/jaeger/log"
 )
 
 // Init creates a new instance of Jaeger tracer.
-func Init(serviceName string, metricsFactory metrics.Factory, logger log.Factory) opentracing.Tracer {
+func Init(serviceName string, metricsFactory metrics.Factory, logger log.Factory) (opentracing.Tracer, io.Closer) {
 	cfg, err := config.FromEnv()
 	if err != nil {
 		logger.Bg().Fatal("cannot parse Jaeger env vars", zap.Error(err))
@@ -24,7 +25,7 @@ func Init(serviceName string, metricsFactory metrics.Factory, logger log.Factory
 	jaegerLogger := jaegerLoggerAdapter{logger.Bg()}
 
 	metricsFactory = metricsFactory.Namespace(serviceName, nil)
-	tracer, _, err := cfg.NewTracer(
+	tracer, closer, err := cfg.NewTracer(
 		config.Logger(jaegerLogger),
 		config.Metrics(metricsFactory),
 		config.Observer(rpcmetrics.NewObserver(metricsFactory, rpcmetrics.DefaultNameNormalizer)),
@@ -32,7 +33,7 @@ func Init(serviceName string, metricsFactory metrics.Factory, logger log.Factory
 	if err != nil {
 		logger.Bg().Fatal("cannot initialize Jaeger Tracer", zap.Error(err))
 	}
-	return tracer
+	return tracer, closer
 }
 
 type jaegerLoggerAdapter struct {
